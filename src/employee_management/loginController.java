@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/javafx/FXML2.java to edit this template
- */
 package employee_management;
 
 import java.net.URL;
@@ -9,26 +5,44 @@ import java.util.ResourceBundle;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Label;
+import javafx.scene.control.Button;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 
-/**
- *
- * @author DELL
- */
-public class loginController implements Initializable {
-    
+public class LoginController implements Initializable {
+
     @FXML
-    private Label label;
-    
+    private TextField uid_field;
+
     @FXML
-    private void handleButtonAction(ActionEvent event) {
-        System.out.println("You clicked me!");
-        label.setText("Hello World!");
-    }
-    
+    private TextField p_field;
+
+    @FXML
+    private Button Btn1;
+
     @Override
     public void initialize(URL url, ResourceBundle rb) {
-        // TODO
-    }    
-    
+        
+    }
+
+    @FXML
+    private void Login(ActionEvent event) {
+        String uid = uid_field.getText();
+        String pass = p_field.getText();
+
+        if(uid.equals("admin") && pass.equals("9999")) {
+            Alert alert = new Alert(AlertType.INFORMATION);
+            alert.setTitle("Login Successful");
+            alert.setHeaderText(null);
+            alert.setContentText("Welcome, Admin!");
+            alert.showAndWait();
+        } else {
+            Alert alert = new Alert(AlertType.ERROR);
+            alert.setTitle("Login Failed");
+            alert.setHeaderText(null);
+            alert.setContentText("Invalid ID or Password");
+            alert.showAndWait();
+        }
+    }
 }
