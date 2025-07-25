@@ -1,20 +1,26 @@
 package employee_management;
 
+import java.io.File;
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.ResourceBundle;
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.*;
-import javafx.stage.Stage;
-import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.HBox;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
+import javafx.fxml.FXMLLoader;
 
 public class DashboardController implements Initializable {
 
@@ -30,13 +36,59 @@ public class DashboardController implements Initializable {
     @FXML private ListView<Employee> listView;
     @FXML private TextField search_field;
 
+    private File selectedImageFile; 
+
     private ObservableList<Employee> employeeList = FXCollections.observableArrayList();
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
         listView.setItems(employeeList);
 
-        // ListView ক্লিক করলে popup তে দেখাবে
+      
+        listView.setCellFactory(param -> new ListCell<Employee>() {
+            private final ImageView imageView = new ImageView();
+            private final Label label = new Label();
+            private final HBox hBox = new HBox(10, imageView, label);
+
+            {
+                imageView.setFitHeight(40);
+                imageView.setFitWidth(40);
+            }
+
+            @Override
+            protected void updateItem(Employee emp, boolean empty) {
+                super.updateItem(emp, empty);
+
+                if (empty || emp == null) {
+                    setGraphic(null);
+                } else {
+                    label.setText(emp.getFullName());
+
+                    if (emp.getImagePath() != null && !emp.getImagePath().isEmpty()) {
+                        try {
+                            imageView.setImage(new Image("file:" + emp.getImagePath()));
+                        } catch (Exception e) {
+                            imageView.setImage(null);
+                        }
+                    } else {
+                        imageView.setImage(null);
+                    }
+
+                    setGraphic(hBox);
+                }
+            }
+        });
+      
+    listView.setOnMouseClicked(event -> {
+        if (event.getClickCount() == 2) {
+            Employee selected = listView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                showEmployeePopup(selected);
+            }
+        }
+    });
+
+        
         listView.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
             if(newSel != null) {
                 showEmployeePopup(newSel);
@@ -69,10 +121,13 @@ public class DashboardController implements Initializable {
             return;
         }
 
-        Employee emp = new Employee(id, fullName, email, dept, degis, salary, gender, edu, skill);
+        String imagePath = (selectedImageFile != null) ? selectedImageFile.getAbsolutePath() : "";
+
+        Employee emp = new Employee(id, fullName, email, dept, degis, salary, gender, edu, skill, imagePath);
 
         employeeList.add(emp);
         clearFields();
+        selectedImageFile = null;
         showAlert(Alert.AlertType.INFORMATION, "Success", "Employee added successfully.");
     }
 
@@ -94,6 +149,10 @@ public class DashboardController implements Initializable {
             selected.setGender(gender_field.getText());
             selected.setEducation(edu_qalification.getText());
             selected.setSkill(skill_field.getText());
+
+            if (selectedImageFile != null) {
+                selected.setImagePath(selectedImageFile.getAbsolutePath());
+            }
 
             listView.refresh();
             showAlert(Alert.AlertType.INFORMATION, "Success", "Employee updated successfully.");
@@ -155,10 +214,19 @@ public class DashboardController implements Initializable {
     }
 
     @FXML
-private void upload_img(ActionEvent event) {
-    
-    System.out.println("Upload image button clicked!");
-}
+    private void upload_img(ActionEvent event) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Employee Image");
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg")
+        );
+
+        selectedImageFile = fileChooser.showOpenDialog(null);
+        if (selectedImageFile != null) {
+            showAlert(Alert.AlertType.INFORMATION, "Image Selected", "Image: " + selectedImageFile.getName());
+        }
+    }
+
     private void clearFields() {
         emid_field.clear();
         fn_field.clear();
@@ -170,6 +238,7 @@ private void upload_img(ActionEvent event) {
         edu_qalification.clear();
         skill_field.clear();
         search_field.clear();
+        selectedImageFile = null;
     }
 
     private void showEmployeePopup(Employee emp) {
@@ -185,6 +254,14 @@ private void upload_img(ActionEvent event) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Employee Details");
         alert.setHeaderText("Details of " + emp.getFullName());
+
+        if (emp.getImagePath() != null && !emp.getImagePath().isEmpty()) {
+            ImageView imageView = new ImageView(new Image("file:" + emp.getImagePath()));
+            imageView.setFitWidth(100);
+            imageView.setFitHeight(100);
+            alert.setGraphic(imageView);
+        }
+
         alert.setContentText(info);
         alert.showAndWait();
     }
@@ -196,4 +273,5 @@ private void upload_img(ActionEvent event) {
         alert.setContentText(message);
         alert.showAndWait();
     }
+    
 }
