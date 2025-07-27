@@ -5,6 +5,7 @@
         <group>
             <file>file:/D:/JavaFxCourse/employee_management/src/employee_management/Employee.java</file>
             <file>file:/D:/JavaFxCourse/employee_management/src/employee_management/Employee_management.java</file>
+            <file>file:/D:/JavaFxCourse/employee_management/src/employee_management/DBConnection.java</file>
             <file>file:/D:/JavaFxCourse/employee_management/src/employee_management/login.fxml</file>
             <file>file:/D:/JavaFxCourse/employee_management/src/employee_management/LoginController.java</file>
             <file>file:/D:/JavaFxCourse/employee_management/src/employee_management/DashboardController.java</file>

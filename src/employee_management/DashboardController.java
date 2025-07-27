@@ -2,6 +2,9 @@ package employee_management;
 
 import java.io.File;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
@@ -11,6 +14,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -20,7 +24,6 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import javafx.fxml.FXMLLoader;
 
 public class DashboardController implements Initializable {
 
@@ -36,15 +39,15 @@ public class DashboardController implements Initializable {
     @FXML private ListView<Employee> listView;
     @FXML private TextField search_field;
 
-    private File selectedImageFile; 
+    private File selectedImageFile;
 
     private ObservableList<Employee> employeeList = FXCollections.observableArrayList();
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
         listView.setItems(employeeList);
+        loadEmployeesFromDB();
 
-      
         listView.setCellFactory(param -> new ListCell<Employee>() {
             private final ImageView imageView = new ImageView();
             private final Label label = new Label();
@@ -78,22 +81,61 @@ public class DashboardController implements Initializable {
                 }
             }
         });
-      
-    listView.setOnMouseClicked(event -> {
-        if (event.getClickCount() == 2) {
+
+        // ✅ Single Click -> TextField এ ডেটা দেখাবে
+        listView.setOnMouseClicked(event -> {
             Employee selected = listView.getSelectionModel().getSelectedItem();
             if (selected != null) {
+                emid_field.setText(selected.getId());
+                fn_field.setText(selected.getFullName());
+                mail_field.setText(selected.getEmail());
+                dept_field.setText(selected.getDepartment());
+                degis_fiekd.setText(selected.getDesignation());
+                salary_field.setText(String.valueOf(selected.getSalary()));
+                gender_field.setText(selected.getGender());
+                edu_qalification.setText(selected.getEducation());
+                skill_field.setText(selected.getSkill());
+            }
+
+            // ✅ Double Click -> Popup দেখাবে
+            if (event.getClickCount() == 2 && selected != null) {
                 showEmployeePopup(selected);
             }
-        }
-    });
+        });
 
-        
-        listView.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
-            if(newSel != null) {
-                showEmployeePopup(newSel);
+        // ✅ যদি selection clear হয় -> সব textfield clear
+        listView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            if (newSelection == null) {
+                clearFields();
             }
         });
+    }
+
+    private void loadEmployeesFromDB() {
+        employeeList.clear();
+        try (Connection conn = DBConnection.getConnection()) {
+            String sql = "SELECT * FROM employees";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                Employee emp = new Employee(
+                        rs.getString("id"),
+                        rs.getString("full_name"),
+                        rs.getString("email"),
+                        rs.getString("department"),
+                        rs.getString("designation"),
+                        rs.getDouble("salary"),
+                        rs.getString("gender"),
+                        rs.getString("education"),
+                        rs.getString("skill"),
+                        rs.getString("image_path")
+                );
+                employeeList.add(emp);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @FXML
@@ -108,64 +150,90 @@ public class DashboardController implements Initializable {
         String edu = edu_qalification.getText();
         String skill = skill_field.getText();
 
-        if(id.isEmpty() || fullName.isEmpty()) {
+        if (id.isEmpty() || fullName.isEmpty()) {
             showAlert(Alert.AlertType.ERROR, "Error", "Employee ID and Full Name are required.");
             return;
         }
 
-        double salary = 0;
+        double salary;
         try {
             salary = Double.parseDouble(salaryStr);
-        } catch(NumberFormatException e) {
+        } catch (NumberFormatException e) {
             showAlert(Alert.AlertType.ERROR, "Error", "Salary must be a number.");
             return;
         }
 
         String imagePath = (selectedImageFile != null) ? selectedImageFile.getAbsolutePath() : "";
 
-        Employee emp = new Employee(id, fullName, email, dept, degis, salary, gender, edu, skill, imagePath);
+        try (Connection conn = DBConnection.getConnection()) {
+            String sql = "INSERT INTO employees (id, full_name, email, department, designation, salary, gender, education, skill, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setString(1, id);
+            ps.setString(2, fullName);
+            ps.setString(3, email);
+            ps.setString(4, dept);
+            ps.setString(5, degis);
+            ps.setDouble(6, salary);
+            ps.setString(7, gender);
+            ps.setString(8, edu);
+            ps.setString(9, skill);
+            ps.setString(10, imagePath);
 
-        employeeList.add(emp);
+            ps.executeUpdate();
+            showAlert(Alert.AlertType.INFORMATION, "Success", "Employee added successfully.");
+            loadEmployeesFromDB();
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Error", "Failed to add employee.");
+        }
+
         clearFields();
         selectedImageFile = null;
-        showAlert(Alert.AlertType.INFORMATION, "Success", "Employee added successfully.");
     }
 
     @FXML
     private void update(ActionEvent event) {
         Employee selected = listView.getSelectionModel().getSelectedItem();
-        if(selected == null) {
+        if (selected == null) {
             showAlert(Alert.AlertType.ERROR, "Error", "Select an employee to update.");
             return;
         }
 
         try {
-            selected.setId(emid_field.getText());
-            selected.setFullName(fn_field.getText());
-            selected.setEmail(mail_field.getText());
-            selected.setDepartment(dept_field.getText());
-            selected.setDesignation(degis_fiekd.getText());
-            selected.setSalary(Double.parseDouble(salary_field.getText()));
-            selected.setGender(gender_field.getText());
-            selected.setEducation(edu_qalification.getText());
-            selected.setSkill(skill_field.getText());
+            double salary = Double.parseDouble(salary_field.getText());
 
-            if (selectedImageFile != null) {
-                selected.setImagePath(selectedImageFile.getAbsolutePath());
+            String imagePath = (selectedImageFile != null) ? selectedImageFile.getAbsolutePath() : selected.getImagePath();
+
+            try (Connection conn = DBConnection.getConnection()) {
+                String sql = "UPDATE employees SET full_name=?, email=?, department=?, designation=?, salary=?, gender=?, education=?, skill=?, image_path=? WHERE id=?";
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ps.setString(1, fn_field.getText());
+                ps.setString(2, mail_field.getText());
+                ps.setString(3, dept_field.getText());
+                ps.setString(4, degis_fiekd.getText());
+                ps.setDouble(5, salary);
+                ps.setString(6, gender_field.getText());
+                ps.setString(7, edu_qalification.getText());
+                ps.setString(8, skill_field.getText());
+                ps.setString(9, imagePath);
+                ps.setString(10, emid_field.getText());
+
+                ps.executeUpdate();
+                showAlert(Alert.AlertType.INFORMATION, "Success", "Employee updated successfully.");
+                loadEmployeesFromDB();
             }
-
-            listView.refresh();
-            showAlert(Alert.AlertType.INFORMATION, "Success", "Employee updated successfully.");
-            clearFields();
-        } catch(NumberFormatException e) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Salary must be a number.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Error", "Failed to update employee.");
         }
+
+        clearFields();
     }
 
     @FXML
     private void delete_field(ActionEvent event) {
         Employee selected = listView.getSelectionModel().getSelectedItem();
-        if(selected == null) {
+        if (selected == null) {
             showAlert(Alert.AlertType.ERROR, "Error", "Select an employee to delete.");
             return;
         }
@@ -176,20 +244,29 @@ public class DashboardController implements Initializable {
         confirm.setContentText("Are you sure you want to delete this employee?");
         Optional<ButtonType> result = confirm.showAndWait();
 
-        if(result.isPresent() && result.get() == ButtonType.OK) {
-            employeeList.remove(selected);
-            clearFields();
-            showAlert(Alert.AlertType.INFORMATION, "Deleted", "Employee deleted successfully.");
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try (Connection conn = DBConnection.getConnection()) {
+                String sql = "DELETE FROM employees WHERE id=?";
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ps.setString(1, selected.getId());
+                ps.executeUpdate();
+
+                showAlert(Alert.AlertType.INFORMATION, "Deleted", "Employee deleted successfully.");
+                loadEmployeesFromDB();
+            } catch (Exception e) {
+                e.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Error", "Failed to delete employee.");
+            }
         }
     }
 
     @FXML
     private void search(ActionEvent event) {
         String keyword = search_field.getText().toLowerCase();
-
         ObservableList<Employee> filteredList = FXCollections.observableArrayList();
-        for(Employee emp : employeeList) {
-            if(emp.getId().toLowerCase().contains(keyword) || emp.getFullName().toLowerCase().contains(keyword)) {
+
+        for (Employee emp : employeeList) {
+            if (emp.getId().toLowerCase().contains(keyword) || emp.getFullName().toLowerCase().contains(keyword)) {
                 filteredList.add(emp);
             }
         }
@@ -208,7 +285,7 @@ public class DashboardController implements Initializable {
             stage.setTitle("Employee Management System - Login");
             stage.setScene(new Scene(root));
             stage.show();
-        } catch(Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -218,7 +295,7 @@ public class DashboardController implements Initializable {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Employee Image");
         fileChooser.getExtensionFilters().addAll(
-            new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg")
+                new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg")
         );
 
         selectedImageFile = fileChooser.showOpenDialog(null);
@@ -246,9 +323,9 @@ public class DashboardController implements Initializable {
         String currentDateTime = dtf.format(LocalDateTime.now());
 
         String info = String.format(
-            "Employee ID: %s\nFull Name: %s\nEmail: %s\nDepartment: %s\nDesignation: %s\nSalary: %.2f\nGender: %s\nEducation: %s\nSkills: %s\n\nDate & Time: %s",
-            emp.getId(), emp.getFullName(), emp.getEmail(), emp.getDepartment(), emp.getDesignation(), emp.getSalary(),
-            emp.getGender(), emp.getEducation(), emp.getSkill(), currentDateTime
+                "Employee ID: %s\nFull Name: %s\nEmail: %s\nDepartment: %s\nDesignation: %s\nSalary: %.2f\nGender: %s\nEducation: %s\nSkills: %s\n\nDate & Time: %s",
+                emp.getId(), emp.getFullName(), emp.getEmail(), emp.getDepartment(), emp.getDesignation(), emp.getSalary(),
+                emp.getGender(), emp.getEducation(), emp.getSkill(), currentDateTime
         );
 
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -273,5 +350,4 @@ public class DashboardController implements Initializable {
         alert.setContentText(message);
         alert.showAndWait();
     }
-    
 }
